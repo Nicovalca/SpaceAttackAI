@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Space Attack — Arcade 1982</title>
+  <meta name="description" content="Space Attack — a retro arcade-style browser game.">
+  <style>
+    html,body{margin:0;min-height:100%;background:#050805}
+    body{overflow-x:hidden}
+    #space-attack-game{--green:#8cff72;--dim:#4f8f47;background:#050805;color:var(--green);font-family:monospace;display:flex;justify-content:center;padding:24px 12px;box-sizing:border-box;min-height:100vh}
+    #space-attack-game .cabinet{width:min(760px,100%);border:2px solid #31592d;background:#020402;padding:14px;box-shadow:0 0 0 4px #0a1209,inset 0 0 40px #000}
+    #space-attack-game .hud{display:flex;justify-content:space-between;padding:5px 8px 10px;color:#72b86a;font-size:13px;letter-spacing:.12em}
+    #space-attack-game .screen{position:relative;width:100%;aspect-ratio:4/3;overflow:hidden;border:1px solid #234422;background:#010201;outline:none;cursor:crosshair}
+    #space-attack-game .start-screen{position:absolute;inset:0;z-index:30;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;background:#010301;padding:24px;box-sizing:border-box}
+    #space-attack-game .start-screen::before{content:"";position:absolute;inset:0;background:radial-gradient(circle at center,rgba(63,120,55,.13),transparent 58%);pointer-events:none}
+    #space-attack-game .start-content{position:relative;z-index:1;max-width:90%}
+    #space-attack-game .start-title{margin:0;color:var(--green);font-size:clamp(38px,9vw,76px);line-height:.95;letter-spacing:.08em;text-shadow:0 0 6px #63ff52,0 0 18px rgba(99,255,82,.45)}
+    #space-attack-game .start-subtitle{margin:14px 0 34px;color:#72b86a;font-size:clamp(11px,2.5vw,16px);letter-spacing:.18em}
+    #space-attack-game .instructions{margin:0 auto 34px;color:#6da866;font-size:clamp(11px,2.4vw,15px);line-height:2;letter-spacing:.08em}
+    #space-attack-game .instructions strong{color:var(--green);font-weight:normal}
+    #space-attack-game .start-prompt{color:var(--green);font-size:clamp(13px,3vw,19px);letter-spacing:.13em;animation:blink 1s steps(2,start) infinite}
+    #space-attack-game.started .start-screen{display:none}
+    #space-attack-game .stars{position:absolute;inset:0;opacity:.4;background-image:radial-gradient(circle,#8cff72 1px,transparent 1px),radial-gradient(circle,#8cff72 1px,transparent 1px);background-size:83px 97px,137px 151px;background-position:17px 22px,61px 73px}
+    #space-attack-game .scanlines{position:absolute;inset:0;z-index:20;pointer-events:none;background:repeating-linear-gradient(to bottom,rgba(140,255,114,.035) 0,rgba(140,255,114,.035) 1px,transparent 1px,transparent 4px)}
+    #space-attack-game .message{position:absolute;top:10px;left:50%;transform:translateX(-50%);color:#31592d;font-size:10px;letter-spacing:.1em;white-space:nowrap;z-index:4}
+    #space-attack-game .ship{position:absolute;left:50%;bottom:22px;width:44px;height:34px;transform:translateX(-50%);filter:drop-shadow(0 0 5px #63ff52);z-index:5}
+    #space-attack-game .ship::before{content:"";position:absolute;left:50%;bottom:0;transform:translateX(-50%);width:0;height:0;border-left:22px solid transparent;border-right:22px solid transparent;border-bottom:30px solid var(--green)}
+    #space-attack-game .ship::after{content:"";position:absolute;left:50%;bottom:0;transform:translateX(-50%);width:10px;height:10px;background:#050805;clip-path:polygon(50% 0,100% 100%,0 100%)}
+    #space-attack-game .enemy-field{position:absolute;inset:0;z-index:3;pointer-events:none}
+    #space-attack-game .enemy{position:absolute;width:30px;height:20px;filter:drop-shadow(0 0 5px var(--enemy-color));color:var(--enemy-color)}
+    #space-attack-game .enemy::before{content:"";position:absolute;left:3px;top:4px;width:24px;height:12px;background:currentColor;clip-path:polygon(0 35%,20% 35%,20% 0,35% 0,35% 35%,65% 35%,65% 0,80% 0,80% 35%,100% 35%,100% 100%,72% 100%,72% 70%,28% 70%,28% 100%,0 100%)}
+    #space-attack-game .enemy::after{content:"";position:absolute;left:9px;top:8px;width:12px;height:5px;background:#050805}
+    #space-attack-game .projectile{position:absolute;width:3px;height:14px;background:var(--green);box-shadow:0 0 7px #63ff52;transform:translateX(-50%);z-index:6}
+    #space-attack-game .game-over{position:absolute;inset:0;z-index:10;display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;background:rgba(0,4,0,.76)}
+    #space-attack-game.game-over .game-over{display:flex}
+    #space-attack-game .game-over h1{margin:0 0 28px;font-size:clamp(34px,8vw,64px);letter-spacing:.12em;text-shadow:0 0 9px #63ff52}
+    #space-attack-game .final-score{margin:0 0 22px;font-size:15px;letter-spacing:.12em;color:#72b86a}
+    #space-attack-game .restart{font-size:clamp(13px,3vw,18px);letter-spacing:.12em;animation:blink 1s steps(2,start) infinite}
+    @keyframes blink{50%{opacity:.18}}
+    @media(prefers-reduced-motion:reduce){#space-attack-game .restart{animation:none}}
+    @media(max-width:520px){
+      #space-attack-game{padding:10px 6px}
+      #space-attack-game .cabinet{padding:8px}
+      #space-attack-game .hud{font-size:10px;padding-left:4px;padding-right:4px}
+      #space-attack-game .message{font-size:8px}
+    }
+  </style>
+</head>
+<body>
+  <div id="space-attack-game">
+    <div class="cabinet">
+      <div class="hud"><span>SPACE ATTACK</span><span id="score">SCORE 0000</span></div>
+      <div class="screen" tabindex="0" role="application" aria-label="Space Attack game field">
+        <div class="start-screen" aria-label="Game start screen">
+          <div class="start-content">
+            <h1 class="start-title">SPACE ATTACK</h1>
+            <div class="start-subtitle">ARCADE • 1982</div>
+            <div class="instructions">
+              <div><strong>← →</strong> MOVE SHIP</div>
+              <div><strong>SPACEBAR</strong> FIRE</div>
+            </div>
+            <div class="start-prompt">PUSH ANY KEY TO START</div>
+          </div>
+        </div>
+        <div class="stars"></div>
+        <div class="message" id="wave-label">WAVE 1 &nbsp; ← → MOVE &nbsp;&nbsp; SPACE FIRE</div>
+        <div class="enemy-field" aria-hidden="true"></div>
+        <div class="ship" aria-label="Player spaceship"></div>
+        <div class="scanlines"></div>
+        <div class="game-over" aria-live="assertive">
+          <h1>GAME OVER</h1>
+          <div class="final-score" id="final-score">SCORE 0000</div>
+          <div class="restart">PRESS ANY KEY TO RESTART</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (() => {
+      const root=document.getElementById('space-attack-game');
+      const screen=root.querySelector('.screen');
+      const ship=root.querySelector('.ship');
+      const enemyField=root.querySelector('.enemy-field');
+      const scoreLabel=root.querySelector('#score');
+      const finalScore=root.querySelector('#final-score');
+      const waveLabel=root.querySelector('#wave-label');
+
+      const keys=new Set();
+      const projectiles=[];
+      const enemies=[];
+      const rows=4, columns=9;
+      const waveColors=['#8cff72','#72d8ff','#d889ff','#ff8c72','#ffe272','#72ffcf'];
+
+      let x=50, score=0, wave=1, gameOver=false, lastTime=0;
+      let fireCooldown=0, formationX=0, formationDirection=1, formationY=58;
+      let animationId=0, started=false;
+
+      function currentColor(){return waveColors[(wave-1)%waveColors.length]}
+      function enemySpeed(){return 25+(wave-1)*9}
+      function pointsPerEnemy(){return wave}
+
+      function updateScore(){
+        const value=String(score).padStart(4,'0');
+        scoreLabel.textContent='SCORE '+value;
+        finalScore.textContent='SCORE '+value;
+      }
+
+      function updateWaveLabel(){
+        waveLabel.textContent='WAVE '+wave+'  ← → MOVE   SPACE FIRE';
+      }
+
+      function createEnemies(){
+        enemyField.innerHTML='';
+        enemies.length=0;
+        const color=currentColor();
+
+        for(let row=0;row<rows;row++){
+          for(let col=0;col<columns;col++){
+            const el=document.createElement('div');
+            el.className='enemy';
+            el.style.setProperty('--enemy-color',color);
+            enemyField.appendChild(el);
+            enemies.push({el,row,col,alive:true});
+          }
+        }
+      }
+
+      function startWave(){
+        createEnemies();
+        formationX=10;
+        formationDirection=1;
+        formationY=58;
+        updateWaveLabel();
+      }
+
+      function startGame(){
+        if(started)return;
+        started=true;
+        root.classList.add('started');
+        resetGame();
+      }
+
+      function resetGame(){
+        projectiles.forEach(p=>p.el.remove());
+        projectiles.length=0;
+        keys.clear();
+        score=0;
+        wave=1;
+        gameOver=false;
+        root.classList.remove('game-over');
+        x=50;
+        fireCooldown=0;
+        updateScore();
+        startWave();
+        lastTime=performance.now();
+        screen.focus();
+      }
+
+      function endGame(){
+        gameOver=true;
+        keys.clear();
+        updateScore();
+        root.classList.add('game-over');
+      }
+
+      function fire(){
+        if(gameOver||fireCooldown>0||projectiles.length>=7)return;
+
+        const el=document.createElement('div');
+        el.className='projectile';
+        el.style.left=x+'%';
+        el.style.bottom='57px';
+        screen.appendChild(el);
+
+        projectiles.push({el,y:57});
+        fireCooldown=.17;
+      }
+
+      function updateProjectiles(dt){
+        for(let i=projectiles.length-1;i>=0;i--){
+          const p=projectiles[i];
+          p.y+=430*dt;
+          p.el.style.bottom=p.y+'px';
+
+          const pr=p.el.getBoundingClientRect();
+          let hit=false;
+
+          for(const enemy of enemies){
+            if(!enemy.alive)continue;
+            const er=enemy.el.getBoundingClientRect();
+
+            if(pr.left<er.right&&pr.right>er.left&&pr.top<er.bottom&&pr.bottom>er.top){
+              enemy.alive=false;
+              enemy.el.remove();
+              score+=pointsPerEnemy();
+              updateScore();
+              hit=true;
+              break;
+            }
+          }
+
+          if(hit||p.y>screen.clientHeight+20){
+            p.el.remove();
+            projectiles.splice(i,1);
+          }
+        }
+      }
+
+      function updateEnemies(dt){
+        formationX+=formationDirection*enemySpeed()*dt;
+
+        const formationWidth=columns*52-22;
+        const leftLimit=10;
+        const rightLimit=Math.max(leftLimit,screen.clientWidth-formationWidth-10);
+
+        if(formationX<=leftLimit||formationX>=rightLimit){
+          formationX=Math.max(leftLimit,Math.min(rightLimit,formationX));
+          formationDirection*=-1;
+          formationY+=13;
+        }
+
+        formationY+=(4+(wave-1)*0.7)*dt;
+
+        let lowest=0, aliveCount=0;
+
+        for(const enemy of enemies){
+          if(!enemy.alive)continue;
+          aliveCount++;
+
+          const px=formationX+enemy.col*52;
+          const py=formationY+enemy.row*34;
+
+          enemy.el.style.left=px+'px';
+          enemy.el.style.top=py+'px';
+
+          lowest=Math.max(lowest,py+20);
+        }
+
+        if(lowest>screen.clientHeight-78){
+          endGame();
+          return;
+        }
+
+        if(aliveCount===0){
+          wave++;
+          startWave();
+        }
+      }
+
+      function frame(now){
+        const dt=Math.min((now-lastTime)/1000,.05);
+        lastTime=now;
+
+        if(!gameOver){
+          const speed=330;
+
+          if(keys.has('ArrowLeft'))
+            x-=(speed*dt/Math.max(1,screen.clientWidth))*100;
+
+          if(keys.has('ArrowRight'))
+            x+=(speed*dt/Math.max(1,screen.clientWidth))*100;
+
+          x=Math.max(5,Math.min(95,x));
+          ship.style.left=x+'%';
+
+          if(keys.has(' '))fire();
+
+          fireCooldown=Math.max(0,fireCooldown-dt);
+
+          updateEnemies(dt);
+          if(!gameOver)updateProjectiles(dt);
+        }
+
+        animationId=requestAnimationFrame(frame);
+      }
+
+      screen.addEventListener('keydown',event=>{
+        if(!started){
+          event.preventDefault();
+          startGame();
+          return;
+        }
+
+        if(gameOver){
+          event.preventDefault();
+          resetGame();
+          return;
+        }
+
+        if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown',' '].includes(event.key)){
+          event.preventDefault();
+          keys.add(event.key);
+          if(event.key===' ')fire();
+        }
+      });
+
+      screen.addEventListener('keyup',event=>keys.delete(event.key));
+      screen.addEventListener('click',()=>screen.focus());
+
+      screen.focus();
+      lastTime=performance.now();
+      animationId=requestAnimationFrame(frame);
+    })();
+  </script>
+</body>
+</html>
